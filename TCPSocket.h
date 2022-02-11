@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "SocketAddress.h"
 
@@ -82,6 +83,12 @@ public:
 
         return n;
     }
+    void SetNonBlocking(bool nonBlocking)
+    {
+        int flags = fcntl(socket, F_GETFL, 0);
+        flags = nonBlocking ? (flags | O_NONBLOCK) : (flags & -O_NONBLOCK);
 
+        fcntl(socket, F_SETFL, flags);
+    }
 };
 typedef std::shared_ptr<TCPSocket> TCPSocketPtr;

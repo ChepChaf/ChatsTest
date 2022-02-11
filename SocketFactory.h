@@ -16,7 +16,7 @@ class SocketFactory
     {
         
     }
-    static TCPSocketPtr NewTCPSocket()
+    static TCPSocketPtr NewTCPSocket(bool nonBlocking=true)
     {
         auto tcpSocket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -26,10 +26,20 @@ class SocketFactory
             return nullptr;
         }
 
-        return TCPSocketPtr(new TCPSocket(tcpSocket));
+        auto sock = new TCPSocket(tcpSocket);
+
+        if (nonBlocking)
+            sock->SetNonBlocking(nonBlocking);
+
+        return TCPSocketPtr(sock);
     }
-    static TCPSocketPtr NewTCPSocket(int socket)
+    static TCPSocketPtr NewTCPSocket(int socket, bool nonBlocking=true)
     {
-        return TCPSocketPtr(new TCPSocket(socket));
+        auto sock = new TCPSocket(socket);
+
+        if (nonBlocking)
+            sock->SetNonBlocking(nonBlocking);
+
+        return TCPSocketPtr(sock);
     }
 };
