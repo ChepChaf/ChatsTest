@@ -3,7 +3,7 @@
 int main()
 {
     auto server = TCPServer();
-    server.Start("127.0.0.1", 8888);
+    server.Start(8888);
 
     while(true)
     {

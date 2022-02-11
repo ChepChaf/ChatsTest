@@ -1,6 +1,7 @@
 #pragma once
 
 #include <netinet/in.h>
+#include <cstring>
 
 struct SocketAddress
 {
@@ -12,4 +13,9 @@ struct SocketAddress
     }
 
     SocketAddress(sockaddr_in inAddress) : address(inAddress) {}
+    public:
+        SocketAddress()
+        {
+            bzero(&address, sizeof(address));
+        }
 };

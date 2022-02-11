@@ -1,8 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
+#include <queue>
 
 #include <sys/select.h>
 
@@ -16,11 +18,12 @@ class TCPServer
 {
     TCPSocketPtr masterSocket;
     std::vector<TCPSocketPtr> clientSockets;
+    std::queue<std::string> clientMessages;
 
 public:
-    bool Start(std::string ip, int port)
+    bool Start(int port)
     {
-        auto socketAddress = SocketAddressFactory::NewAddress(ip, port);
+        auto socketAddress = SocketAddressFactory::NewLocalAddressOnPort(port);
         auto socket = SocketFactory::NewTCPSocket();
 
         socket->Bind(socketAddress);
@@ -36,8 +39,16 @@ public:
         return false;
     }
 
-    void Run()
+    void RemoveSocket(int socket)
     {
+        auto it = std::remove_if(
+            clientSockets.begin(), clientSockets.end(), [=](auto s1){return s1->GetSocket() == socket;});
+
+        clientSockets.erase(it, clientSockets.end());
+    }
+
+    void Run()
+    {        
         fd_set readfds;
 
         FD_ZERO(&readfds);
@@ -64,37 +75,47 @@ public:
             return;
         }
 
-        std::string message = "Welcome!\n";
+        std::string message = "Welcome!\r\n";
         if (FD_ISSET(masterSocket->GetSocket(), &readfds))
         {
-            sockaddr_in clientAddr;
-            auto cliLen = sizeof(clientAddr);
-            int cSock = accept(masterSocket->GetSocket(), reinterpret_cast<sockaddr *>(&clientAddr),
-                           reinterpret_cast<socklen_t *>(&cliLen));
+            auto clientAddr = SocketAddress();
+            auto cSock = masterSocket->Accept(clientAddr);
 
-            if (cSock == -1)
-            {
-                std::cout << "Error accepting connection from client" << std::endl;
-            }
+            cSock->Send(message);
+            std::cout << "Client connected." << std::endl;
 
-            send(cSock, message.c_str(), sizeof(message.c_str()), 0);
-
-            clientSockets.push_back(SocketFactory::NewTCPSocket(cSock));
+            clientSockets.push_back(cSock);
         }
 
         char buffer[1024];
         for (auto cSocket : clientSockets)
-        {   
-            auto fd = cSocket->GetSocket();
-
-            if (FD_ISSET(fd, &readfds))
+        {
+            if (FD_ISSET(cSocket->GetSocket(), &readfds))
             {
-                bzero(&buffer, 1024);
+                bzero(buffer, sizeof(buffer));
 
-                int n = read(fd, &buffer, 1024);
+                int n = cSocket->Receive(buffer, 1024);
 
-                if (n > 0)
-                    std::cout << "Client: " << buffer << std::endl;
+                if (n <= 0)
+                {
+                    RemoveSocket(cSocket->GetSocket());
+                    std::cout << "Client disconnected." << std::endl;
+
+                    continue;
+                }
+
+                clientMessages.push(buffer);
+            }
+        }
+
+        while(clientMessages.size() > 0)
+        {
+            auto message = clientMessages.front();
+            clientMessages.pop();
+
+            for (auto socket : clientSockets)
+            {
+                socket->Send("Client: " + message);
             }
         }
     }
